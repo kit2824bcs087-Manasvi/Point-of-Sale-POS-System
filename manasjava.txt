@@ -1,0 +1,127 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class POSSystem {
+
+    static Scanner sc = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        Connection con = DBConnection.getConnection();
+
+        if (con == null) {
+            System.out.println("Database connection failed!");
+            return;
+        }
+
+        while (true) {
+            System.out.println("\n===== POS SYSTEM =====");
+            System.out.println("1. Add Product");
+            System.out.println("2. View Products");
+            System.out.println("3. Sell Product");
+            System.out.println("4. Exit");
+            System.out.print("Enter choice: ");
+
+            int choice = sc.nextInt();
+
+            try {
+                switch (choice) {
+                    case 1:
+                        addProduct(con);
+                        break;
+                    case 2:
+                        viewProducts(con);
+                        break;
+                    case 3:
+                        sellProduct(con);
+                        break;
+                    case 4:
+                        System.out.println("Exiting...");
+                        System.exit(0);
+                    default:
+                        System.out.println("Invalid choice!");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void addProduct(Connection con) throws SQLException {
+        sc.nextLine();
+        System.out.print("Enter product name: ");
+        String name = sc.nextLine();
+
+        System.out.print("Enter price: ");
+        double price = sc.nextDouble();
+
+        System.out.print("Enter quantity: ");
+        int qty = sc.nextInt();
+
+        String query = "INSERT INTO products(name, price, quantity) VALUES (?, ?, ?)";
+        PreparedStatement pst = con.prepareStatement(query);
+        pst.setString(1, name);
+        pst.setDouble(2, price);
+        pst.setInt(3, qty);
+
+        pst.executeUpdate();
+        System.out.println("Product added successfully!");
+    }
+
+    public static void viewProducts(Connection con) throws SQLException {
+        String query = "SELECT * FROM products";
+        Statement st = con.createStatement();
+        ResultSet rs = st.executeQuery(query);
+
+        System.out.println("\n--- Product List ---");
+        while (rs.next()) {
+            System.out.println(
+                rs.getInt("id") + " | " +
+                rs.getString("name") + " | " +
+                rs.getDouble("price") + " | " +
+                rs.getInt("quantity")
+            );
+        }
+    }
+
+    public static void sellProduct(Connection con) throws SQLException {
+        System.out.print("Enter product ID: ");
+        int id = sc.nextInt();
+
+        System.out.print("Enter quantity: ");
+        int qty = sc.nextInt();
+
+        String checkQuery = "SELECT * FROM products WHERE id=?";
+        PreparedStatement pst = con.prepareStatement(checkQuery);
+        pst.setInt(1, id);
+        ResultSet rs = pst.executeQuery();
+
+        if (rs.next()) {
+            int stock = rs.getInt("quantity");
+            double price = rs.getDouble("price");
+
+            if (stock >= qty) {
+                double total = price * qty;
+
+                // Update stock
+                String updateQuery = "UPDATE products SET quantity = quantity - ? WHERE id=?";
+                PreparedStatement pst2 = con.prepareStatement(updateQuery);
+                pst2.setInt(1, qty);
+                pst2.setInt(2, id);
+                pst2.executeUpdate();
+
+                String saleQuery = "INSERT INTO sales(product_id, quantity, total_price) VALUES (?, ?, ?)";
+                PreparedStatement pst3 = con.prepareStatement(saleQuery);
+                pst3.setInt(1, id);
+                pst3.setInt(2, qty);
+                pst3.setDouble(3, total);
+                pst3.executeUpdate();
+
+                System.out.println("Sale successful! Total = " + total);
+            } else {
+                System.out.println("Insufficient stock!");
+            }
+        } else {
+            System.out.println("Product not found!");
+        }
+    }
+}
